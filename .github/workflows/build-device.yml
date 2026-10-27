@@ -1,0 +1,46 @@
+name: build-device-ipa
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swiftc --version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Build device IPA
+        working-directory: autocam-ios
+        run: bash build_device.sh
+
+      - name: Verify artifact
+        run: |
+          test -f autocam-ios/dist/1.ipa
+          unzip -l autocam-ios/dist/1.ipa | grep "Payload/1.app/1"
+          echo "IPA size: $(stat -f%z autocam-ios/dist/1.ipa) bytes"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 1-ipa-device
+          path: autocam-ios/dist/1.ipa
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: device-build-${{ github.run_number }}
+          name: 1 真机测试包 (build ${{ github.run_number }})
+          body: |
+            真机 IPA（arm64, iOS 16+）。Windows 端使用 Sideloadly 通过 Apple ID 重签名后安装到 iPhone。
+            Bundle ID: cn.juhua.app1；App 名称：1。
+          files: autocam-ios/dist/1.ipa
